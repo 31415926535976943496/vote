@@ -1,0 +1,5 @@
+{
+  "name": "SecureVote 安全投票",
+  "description": "一個安全、基於角色的投票平台，具有管理員控制、IP 追蹤和網站安全閘道功能。",
+  "requestFramePermissions": []
+}
