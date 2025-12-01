@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { User, Session } from '../types';
+import { fetchData, submitVote, saveUser } from '../services/api';
 import { LogOut, Vote, Lock, AlertCircle, CheckCircle2, User as UserIcon } from 'lucide-react';
 
 interface UserPanelProps {
@@ -11,79 +12,46 @@ export const UserPanel: React.FC<UserPanelProps> = ({ user, onLogout }) => {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'vote' | 'profile'>('vote');
-
+  
   // Profile State
   const [newPassword, setNewPassword] = useState('');
   const [passMsg, setPassMsg] = useState('');
 
-  // KV 投票 state
-  const [results, setResults] = useState<Record<string, number>>({});
-  const [msg, setMsg] = useState('');
-
-  // 模擬載入活動 (保持原本 sessions 結構)
   const loadData = async () => {
     setLoading(true);
-    // 假設從原本 fetchData 或後端取得 sessions
-    // 這裡你可以保留原本邏輯
+    const data = await fetchData();
+    // Filter sessions where user is allowed
+    const mySessions = data.sessions.filter(s => s.allowedUserIds.includes(user.id));
+    setSessions(mySessions);
     setLoading(false);
   };
 
   useEffect(() => {
     loadData();
-    const interval = setInterval(loadData, 5000); // Live 更新活動
-    fetchResults(); // 初次抓 KV 結果
-    const resultInterval = setInterval(fetchResults, 5000); // 每 5 秒更新結果
-    return () => {
-      clearInterval(interval);
-      clearInterval(resultInterval);
-    };
-  }, []);
+    const interval = setInterval(loadData, 5000); // Live updates
+    return () => clearInterval(interval);
+  }, [user.id]);
 
-  // ================= KV 投票 =================
-  const handleVote = async (option: string) => {
-    setMsg('送出中...');
-    try {
-      const res = await fetch('/api/vote', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ option })
-      });
-      if (res.ok) {
-        setMsg('送出成功');
-        fetchResults();
-      } else {
-        setMsg('送出失敗');
-      }
-    } catch (err) {
-      setMsg('投票失敗');
+  const handleVote = async (sessionId: string, optionId: string) => {
+    const success = await submitVote(sessionId, optionId, user.id);
+    if (success) {
+      loadData();
+    } else {
+      alert("投票失敗。您可能已用完票數或活動已結束。");
     }
   };
-
-  const fetchResults = async () => {
-    try {
-      const res = await fetch('/api/results');
-      if (res.ok) {
-        const data = await res.json();
-        setResults(data);
-      }
-    } catch {}
-  };
-  // ==========================================
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPassword) return;
     
-    // 假設 saveUser 還在
-    await fetch('/api/saveUser', { // 可自行改成原本後端 API
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...user, password: newPassword })
-    });
+    await saveUser({ ...user, password: newPassword });
     setPassMsg('密碼更新成功');
     setNewPassword('');
     setTimeout(() => setPassMsg(''), 3000);
   };
+
+  const getRemainingVotes = (s: Session) => s.votesPerUser - (s.userVotes[user.id] || 0);
 
   return (
     <div className="min-h-screen bg-slate-900">
@@ -119,15 +87,15 @@ export const UserPanel: React.FC<UserPanelProps> = ({ user, onLogout }) => {
         {activeTab === 'vote' && (
           <div className="space-y-8">
             <div className="mb-6">
-              <h1 className="text-2xl font-bold text-white">投票活動</h1>
+              <h1 className="text-2xl font-bold text-white">進行中的活動</h1>
               <p className="text-slate-400">請在下方進行投票。</p>
-              {msg && <p className="text-green-400 mt-2">{msg}</p>}
             </div>
 
             {sessions.length === 0 && !loading && (
                <div className="text-center py-20 bg-slate-800/50 rounded-xl border border-slate-700 border-dashed">
                  <AlertCircle className="w-12 h-12 text-slate-500 mx-auto mb-4" />
                  <h3 className="text-slate-300 font-medium">沒有進行中的投票</h3>
+                 <p className="text-slate-500 text-sm">目前沒有可供您參與的投票活動。</p>
                </div>
             )}
 
@@ -136,6 +104,14 @@ export const UserPanel: React.FC<UserPanelProps> = ({ user, onLogout }) => {
                 <div className="p-6 border-b border-slate-700 bg-slate-800/50 flex justify-between items-center">
                   <div>
                     <h2 className="text-xl font-bold text-white">{session.title}</h2>
+                    <div className="flex items-center gap-4 mt-2">
+                       <span className={`text-xs font-bold px-2 py-0.5 rounded uppercase tracking-wide ${session.isActive ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                         {session.isActive ? '開放中' : '已結束'}
+                       </span>
+                       <span className="text-sm text-slate-400">
+                         剩餘票數: <span className="text-white font-mono font-bold">{getRemainingVotes(session)}</span> / {session.votesPerUser}
+                       </span>
+                    </div>
                   </div>
                 </div>
                 
@@ -143,13 +119,17 @@ export const UserPanel: React.FC<UserPanelProps> = ({ user, onLogout }) => {
                   {session.options.map(option => (
                     <button
                       key={option.id}
-                      disabled={!session.isActive}
-                      onClick={() => handleVote(option.id)}
+                      disabled={!session.isActive || getRemainingVotes(session) <= 0}
+                      onClick={() => handleVote(session.id, option.id)}
                       className="group relative flex flex-col items-start p-4 rounded-lg border border-slate-700 bg-slate-900/50 hover:bg-blue-900/10 hover:border-blue-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-left"
                     >
                       <span className="font-semibold text-slate-200 group-hover:text-blue-400 transition-colors">{option.text}</span>
-                      <div className="mt-2 text-sm text-white">
-                        票數: {results[option.id] ?? 0} 票
+                      <div className="mt-2 w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                         {/* Visual feedback of popularity without showing exact numbers if desired, or just show relative bar */}
+                         <div 
+                           className="h-full bg-blue-600 opacity-20 group-hover:opacity-100 transition-all" 
+                           style={{width: '0%'}} // Logic to show live results could go here if user is allowed to see them
+                         ></div> 
                       </div>
                       <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
                         <CheckCircle2 className="w-5 h-5 text-blue-500" />

@@ -1,5 +1,6 @@
+
 import { AppState, Session, User } from '../types';
-import { API_BASE_URL, DEFAULT_ADMIN_USER, DEFAULT_START_PASSWORD, MOCK_DELAY } from '../constants';
+import { API_BASE_URL, DEFAULT_ADMIN_USER, DEFAULT_START_PASSWORD, MOCK_DELAY, USE_MOCK_DATA } from '../constants';
 
 // --- Mock Data Helper ---
 const getMockData = (): AppState => {
@@ -22,7 +23,7 @@ const setMockData = (data: AppState) => {
 // --- API Methods ---
 
 export const checkStartPassword = async (password: string): Promise<boolean> => {
-  if (!API_BASE_URL) {
+  if (USE_MOCK_DATA) {
     const data = getMockData();
     return data.config.startPassword === password;
   }
@@ -34,7 +35,7 @@ export const checkStartPassword = async (password: string): Promise<boolean> => 
 };
 
 export const login = async (username: string, password: string): Promise<User | null> => {
-  if (!API_BASE_URL) {
+  if (USE_MOCK_DATA) {
     await new Promise(r => setTimeout(r, MOCK_DELAY));
     const data = getMockData();
     const user = data.users.find(u => u.username === username && u.password === password);
@@ -58,7 +59,7 @@ export const login = async (username: string, password: string): Promise<User | 
 };
 
 export const fetchData = async (): Promise<AppState> => {
-  if (!API_BASE_URL) {
+  if (USE_MOCK_DATA) {
     await new Promise(r => setTimeout(r, MOCK_DELAY));
     return getMockData();
   }
@@ -67,7 +68,7 @@ export const fetchData = async (): Promise<AppState> => {
 };
 
 export const saveUser = async (user: User): Promise<User> => {
-  if (!API_BASE_URL) {
+  if (USE_MOCK_DATA) {
     const data = getMockData();
     const idx = data.users.findIndex(u => u.id === user.id);
     if (idx >= 0) {
@@ -86,7 +87,7 @@ export const saveUser = async (user: User): Promise<User> => {
 };
 
 export const deleteUser = async (userId: string): Promise<void> => {
-  if (!API_BASE_URL) {
+  if (USE_MOCK_DATA) {
     const data = getMockData();
     data.users = data.users.filter(u => u.id !== userId);
     setMockData(data);
@@ -96,7 +97,7 @@ export const deleteUser = async (userId: string): Promise<void> => {
 };
 
 export const saveSession = async (session: Session): Promise<Session> => {
-  if (!API_BASE_URL) {
+  if (USE_MOCK_DATA) {
     const data = getMockData();
     const idx = data.sessions.findIndex(s => s.id === session.id);
     if (idx >= 0) {
@@ -115,7 +116,7 @@ export const saveSession = async (session: Session): Promise<Session> => {
 };
 
 export const deleteSession = async (sessionId: string): Promise<void> => {
-  if (!API_BASE_URL) {
+  if (USE_MOCK_DATA) {
     const data = getMockData();
     data.sessions = data.sessions.filter(s => s.id !== sessionId);
     setMockData(data);
@@ -125,7 +126,7 @@ export const deleteSession = async (sessionId: string): Promise<void> => {
 };
 
 export const submitVote = async (sessionId: string, optionId: string, userId: string): Promise<boolean> => {
-  if (!API_BASE_URL) {
+  if (USE_MOCK_DATA) {
     const data = getMockData();
     const session = data.sessions.find(s => s.id === sessionId);
     const user = data.users.find(u => u.id === userId);

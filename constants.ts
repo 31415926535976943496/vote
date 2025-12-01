@@ -1,6 +1,10 @@
-// Switch this to your Cloudflare Worker URL in production
-// e.g., "https://my-voting-worker.username.workers.dev"
+
+// Cloudflare Pages 會自動將 /api 請求導向 functions，所以這裡留空即可使用相對路徑
 export const API_BASE_URL = ""; 
+
+// 設定為 false 以使用 Cloudflare Pages Functions 後端
+// 設定為 true 以強制使用瀏覽器 localStorage 測試
+export const USE_MOCK_DATA = false;
 
 export const MOCK_DELAY = 400;
 
